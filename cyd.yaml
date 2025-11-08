@@ -1,0 +1,1083 @@
+esphome:
+  name: cyd2
+  friendly_name: CYD2
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "ENCRYPTION KEY HERE"
+ 
+ota:
+  - platform: esphome
+    password: "OTA KEY"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Cyd2 Fallback Hotspot"
+    password: "GxQWJlUMj6TG"
+
+# This is the itme section. It pulls the current time from Home Assistant, and executes an update every mimute.
+time:
+  - platform: homeassistant
+    timezone: America/New_York
+    id: homeassistant_time
+    on_time_sync:
+      - script.execute: time_update
+    on_time:
+      - minutes: '*'
+        seconds: 0
+        then:
+          - script.execute: time_update
+
+script:
+  - id: time_update
+    then:
+      # Update the Time Label with the ID lbl_time2
+      - lvgl.label.update:
+          id: lbl_time2
+          text: !lambda |-
+             return id(homeassistant_time).now().strftime("%I:%M %p"); # the strftime formatting is universal, you can google it if you want to change how it is displayed, I went with a 01:23 AM format.
+
+# These are the default pins needed for the touchscreen and the display to work, you can see examples and compare with the Random Nerd Tutorials page on the CYD Pinout.
+spi:
+  - id: tft
+    clk_pin: GPIO14
+    mosi_pin: GPIO13
+    miso_pin: GPIO12
+  - id: touch
+    clk_pin: GPIO25
+    mosi_pin: GPIO32
+    miso_pin: GPIO39
+
+# Setup a pin to control the backlight and the LED. Inverted True is needed, since the CYD uses active low on the outputs for the LED.
+output:
+  - platform: ledc
+    pin: GPIO21
+    id: backlight_pwm
+    frequency: 1000 Hz
+  - platform: ledc
+    id: output_red
+    pin: GPIO4
+    inverted: true
+  - platform: ledc
+    id: output_green
+    pin: GPIO16
+    inverted: true
+  - platform: ledc
+    id: output_blue
+    pin: GPIO17
+    inverted: true
+
+# This section is for controlling the  backlight and LED. I am using the LDR (light dependant resistor) that is built into the CYD, to control the brightness (bright room, bright display, etc)
+light:
+  - platform: monochromatic
+    output: backlight_pwm  # Make sure to set this pin correctly.
+    name: Display Backlight
+    id: backlight
+    restore_mode: ALWAYS_ON
+  - platform: rgb
+    name: LED
+    red: output_red
+    id: led
+    green: output_green
+    blue: output_blue
+    restore_mode: ALWAYS_OFF
+    
+display: # This is the display section, you can adjust values as needed, but this is a working example. 
+  - platform: ili9xxx
+    model: ILI9341
+    color_palette: 8BIT
+    #id: tft
+    spi_id: tft
+    cs_pin: GPIO15
+    dc_pin: GPIO2
+    auto_clear_enabled: false # THis MUST remain false in order to work, yeah its weird.
+    rotation: 180 # Set your rotation as needed
+    dimensions:
+      width: 320
+      height: 240
+    invert_colors: false
+    color_order: rgb # This one is IMPORTANT, i couldnt figure out why the colors didnt track RGB, and that is beacuse the default is GRB. This was just my quality of life change.
+
+# Here is where I set my images. I have them uploaded to the same folder on Home Assistant that the YAML file exists in. You will need to look around on whatever device is running home assistant to find the location. 
+# I am running ESPHome in a docker container, and I have a volume mounted to the container, so for me its /opt/esphome/configs . The images are in that folder along side the YAML file that is being uploaded to the CYD from ESPHome. You can tailor the locations as needed.
+image:
+  - file: "wallpaper11.png"
+    type: rgb565
+    id: my_image
+    
+
+  - file: "play.svg"
+    type: rgb565
+    id: play
+    transparency: alpha_channel
+    resize: 30x30
+  - file: "pause.svg"
+    type: rgb565
+    id: pausem
+    transparency: alpha_channel
+    resize: 30x30
+  - file: "forward.svg"
+    type: rgb565
+    id: forward
+    transparency: alpha_channel
+    resize: 30x30
+  - file: "backward.svg"
+    type: rgb565
+    id: backward
+    transparency: alpha_channel
+    resize: 30x30
+
+lvgl:
+  buffer_size: 25%
+# The LVGL buffer is set to 25%, in order to leave room on the flash for the images. This is fine. 
+
+  # The Theme Section, this section sets some of the "defaults" for the styling. Such as the button colors, border colors, and what colors the buttons are when they are pressed, etc. These can be overridden when we get down to the actual buttons themselves
+  theme:
+    label:
+      text_font: font1 # set all your labels to use your custom defined font
+    button:
+      bg_color: 0xFFA500
+      bg_grad_color: 0x880011
+      bg_grad_dir: VER
+      bg_dither_mode: ordered
+      bg_opa: .5
+      border_color: 0x000000
+      border_width: 1
+      text_color: 0xFFFFFF
+      pressed: # set some button colors to be different in pressed state
+        bg_color: 0x000000
+        bg_grad_color: 0xFF2211
+        bg_opa: .8
+      checked: # set some button colors to be different in checked or "active" state
+        bg_color: 0x000000
+        bg_grad_color: 0xFF2200
+        text_color: 0xFFFFFF
+        bg_opa: .8
+  top_layer: # The TOP LAYER, is the one that shows no matter what, its on "top" of all of the pages, so for things like the time, and navigation, it saves replicating it across pages.
+    widgets:
+      - label:
+            id: lbl_time2 # This is the time display, the script is what changes this label ID. 
+            text: "00:00"
+            #x: 120
+            y: 0
+            width: 100%
+            text_font: bbh_16
+            text_color: 0xFFFFFF
+            text_align: center
+            outline_color: black
+            bg_color: 0x000000
+            bg_opa: .7
+            radius: 10
+      - label:
+            id: label_12 # This is the temp display, I have it coming from a temp sensor in my back yard
+            x: 10
+            y: 5
+            text_font: bbn_17
+            text_color: 0xFFFFFF
+            text: "00.0"
+
+      - label:
+            id: label_14 # I was too lazy to add the Farenheight symbol so i just did it manually. 
+            x: 68
+            y: 2
+            text_font: roboto_16
+            text_color: 0xFFFFFF
+            text: "F"
+
+      - buttonmatrix: # This is the navigation at the bottom. Just changes the page, and I set a "home" as the primary page.
+          align: bottom_mid
+          pad_all: 0
+          #outline_width: 0
+          border_opa: TRANSP
+          shadow_opa: TRANSP
+          id: top_layer
+          height: 40
+          bg_color: 0x000000
+          bg_opa: TRANSP
+          items:
+            bg_color: 0x000000 # background for all buttons
+            shadow_opa: TRANSP
+            text_color: 0xFFFFFF
+          rows:
+            - buttons:
+              - id: page_prev
+                text: "\uF053"
+                
+                on_press:
+                  then:
+                    lvgl.page.previous:
+              - id: page_home
+                text: "\uF015"
+                
+                on_press:
+                  then:
+                    lvgl.page.show: main_page
+              - id: page_next
+                text: "\uF054"
+                
+                on_press:
+                  then:
+                    lvgl.page.next:
+  # Here We define the touch screen, this should be towards the top, but it is here 
+  touchscreens:
+    - xpt2046_touch
+  pages:
+    - id: main_page
+      #bg_color: 0x000000
+      bg_image_src: my_image
+      bg_color: 0xFFA500
+      bg_grad_color: 0x990022
+      bg_grad_dir: VER
+      bg_dither_mode: ordered
+      bg_opa: COVER
+      widgets:
+        - button:
+            id: button_0
+            x: 5
+            y: 50
+            width: 100
+            height: 50
+            checkable: true
+            bg_color: 0x000000
+            shadow_opa: TRANSP
+            checked:
+              text_color: 0xFFFFFF
+            on_click:
+                - homeassistant.action:
+                    action: switch.toggle
+                    data:
+                      entity_id: switch.garage_light_socket_1
+            widgets:
+              - label :
+                  align: center
+                  text: "Garage"
+                  text_font: bbn_12
+        - button:
+            id: button_11
+            x: 215
+            y: 50
+            width: 100
+            height: 50
+            checkable: true
+            bg_color: 0x000000
+            shadow_opa: TRANSP
+            checked:
+              text_color: 0xFFFFFF
+            on_click:
+                - homeassistant.action:
+                    action: switch.toggle
+                    data:
+                      entity_id: switch.adguard_home_filtering
+            widgets:
+              - label :
+                  align: center
+                  text: "Ad Block"
+                  text_font: bbn_12
+
+        - button:
+            id: button_1
+            x: 110
+            y: 50
+            width: 100
+            height: 50
+            checkable: true
+            bg_color: 0x000000
+            shadow_opa: TRANSP
+            checked:
+              text_color: 0xFFFFFF
+            on_click:
+                - homeassistant.action:
+                    action: switch.toggle
+                    data:
+                      entity_id: switch.bedroom_lights_new_switch_1
+            widgets:
+              - label :
+                  align: center
+                  text: "Bedroom"
+                  text_font: bbn_12
+
+        
+
+        - label:
+            id: label_13
+            #x: 145
+            y: 155
+            text_font: bbn_17
+            text_align: center
+            text_color: 0xFFFFFF
+            width: 95%
+            text: "Condition: "
+
+        
+
+#label_cond_icon
+
+        - button:
+            id: button_9
+            x: 5
+            y: 105
+            width: 100
+            height: 50
+            bg_color: 0x000000
+            shadow_opa: TRANSP
+            checkable: true
+            checked:
+              text_color: 0xFFFFFF
+            on_click:
+                - homeassistant.action:
+                    action: switch.toggle
+                    data:
+                      entity_id: switch.deck_light_switch_1
+            widgets:
+              - label :
+                  align: center
+                  text: "Back Yard"
+                  text_font: bbn_12
+        - button:
+            id: button_10
+            x: 110
+            y: 105
+            width: 100
+            height: 50
+            checkable: true
+            bg_color: 0x000000
+            shadow_opa: TRANSP
+            checked:
+              text_color: 0xFFFFFF
+            on_click:
+                - homeassistant.action:
+                    action: switch.toggle
+                    data:
+                      entity_id: switch.floor_lamp_socket
+            widgets:
+              - label :
+                  align: center
+                  text: "Floor Lamp"
+                  text_font: bbn_12
+        - button:
+            id: button_16
+            x: 215
+            y: 105
+            width: 100
+            height: 50
+            checkable: true
+            bg_color: 0x000000
+            shadow_opa: TRANSP
+            checked:
+              text_color: 0xFFFFFF
+            on_click:
+                - homeassistant.action:
+                    action: switch.toggle
+                    data:
+                      entity_id: switch.pool_lights_socket_1
+            widgets:
+              - label :
+                  align: center
+                  text: "Pool Light"
+                  text_font: bbn_12
+        
+
+    - id: second_page
+      #bg_color: 0xFFA588
+      #bg_grad_color: 0x000099
+      #bg_grad_dir: VER
+      #bg_dither_mode: ordered
+      bg_image_src: my_image
+      bg_opa: COVER
+      widgets:
+        - obj:
+            align: TOP_MID
+            width: 320
+            height: 240
+            bg_opa: TRANSP
+            border_opa: TRANSP
+            widgets:
+  
+              - label:
+                  id: label_16
+                  x: 180
+                  y: 38
+                  text_font: font2
+                  text_color: 0xFFFFFF
+                  text: "power: " 
+                  outline_color: black
+              - label:
+                  id: label_17
+                  x: 253
+                  y: 38
+                  text_font: font3
+                  text_color: 0xFFFFFF
+                  text: "W" 
+                  outline_color: black
+              - label:
+                  id: label_21
+                  x: 253
+                  y: 68
+                  text_font: font3
+                  text_color: 0xFFFFFF
+                  text: "o" 
+                  outline_color: black
+              - label:
+                  id: label_18
+                  x: 180
+                  y: 68
+                  text_font: font2
+                  text_color: 0xFFFFFF
+                  text: "Temp: " 
+                  outline_color: black
+              - label:
+                  id: label_19
+                  x: 1
+                  y: 41
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "Server Power: " 
+                  outline_color: black
+              - label:
+                  id: label_20
+                  x: 1
+                  y: 71
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "Outside Temp: " 
+                  outline_color: black
+              - label:
+                  id: label_22
+                  x: 1
+                  y: 101
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "Torrents: " 
+                  outline_color: black
+              - label:
+                  id: label_23
+                  x: 180
+                  y: 102
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "alarm: " 
+                  outline_color: black
+              - label:
+                  id: label_24
+                  x: 1
+                  y: 131
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "Plex Watching: " 
+                  outline_color: black
+              - label:
+                  id: label_25
+                  x: 180
+                  y: 130
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "plexwatch: " 
+                  outline_color: black
+    
+    - id: third_page
+      #bg_color: 0x000000
+      #bg_grad_color: 0x000099
+      #bg_grad_dir: VER
+      #bg_dither_mode: ordered
+      bg_image_src: my_image
+      bg_opa: COVER
+      widgets:
+          - label:
+                  id: label_28
+                  x: 5
+                  y: 131
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "WAN Download: " 
+                  outline_color: black      
+          - label:
+                  id: label_29
+                  x: 210
+                  y: 130
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "100" 
+                  outline_color: black      
+          - label:
+                  id: label_30
+                  x: 5
+                  y: 160
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "WAN Upload: " 
+                  outline_color: black
+          - label:
+                  id: label_31
+                  x: 210
+                  y: 160
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "100" 
+                  outline_color: black
+          - label:
+                  id: label_32
+                  x: 5
+                  y: 100
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "3d Printer: " 
+                  outline_color: black
+          - label:
+                  id: label_33
+                  x: 210
+                  y: 100
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "loading " 
+                  outline_color: black
+          - label:
+                  id: label_34
+                  x: 280
+                  y: 100
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "%" 
+                  outline_color: black
+          - button:
+              id: button_35
+              x: 5
+              y: 50
+              width: 100
+              height: 45
+              checkable: true
+              bg_color: 0x000000
+              shadow_opa: TRANSP
+              checked:
+                text_color: 0xFFFFFF
+              on_click:
+                  - homeassistant.action:
+                      action: switch.toggle
+                      data:
+                        entity_id: switch.kitchen_lights_socket_1
+              widgets:
+                - label :
+                    align: center
+                    text: "Desk Light"
+                    text_font: bbn_12
+
+          - button:
+              id: button_12
+              x: 215
+              y: 50
+              width: 100
+              height: 45
+              checkable: true
+              bg_color: 0x000000
+              shadow_opa: TRANSP
+              checked:
+                text_color: 0xFFFFFF
+              on_click:
+               - homeassistant.action:
+                    action: switch.toggle
+                    data:
+                      entity_id: switch.office_uplight_socket_1
+              widgets:
+                - label :
+                    align: center
+                    text: "Office Light"
+                    text_font: bbn_12
+    - id: fourth_page
+      #bg_color: 0x000000
+      #bg_grad_color: 0x000099
+      #bg_grad_dir: VER
+      #bg_dither_mode: ordered
+      bg_image_src: my_image
+      bg_opa: COVER
+      widgets:
+          - label:
+                  id: title_text
+                  x: 10
+                  y: 55
+                  text_font: bbn_17
+                  text_color: 0xFFFFFF
+                  text: "Title " 
+                  outline_color: black
+          - label:
+                  id: artist_text
+                  x: 10
+                  y: 95
+                  text_font: bbn_16
+                  text_color: 0xFFFFFF
+                  text: "Artist " 
+                  outline_color: black
+          - button:
+              id: prev_btn
+              x: 5
+              y: 150
+              width: 100
+              height: 45
+              bg_color: 0x000000
+              widgets:
+                - image :
+                    id: back_icon
+                    src: backward
+                    antialias: true
+                    align: center
+                
+             #    - label :
+            #       align: center
+            #       text: "<<"
+            #       text_font: roboto_17
+              on_press:
+                then:
+                  - homeassistant.service:
+                      service: media_player.media_previous_track
+                      data:
+                        entity_id: media_player.spotify_matt_greathouse
+          - button:
+              id: play_pause_btn
+              x: 110
+              y: 150
+              width: 100
+              height: 45
+              bg_color: 0x000000
+              widgets:
+                - image :
+                    id: play_icon
+                    src: play 
+                    antialias: true
+                    align: center
+                
+                #- label :
+                #    align: center
+                #    text: "▶/⏸"
+                #    text_font: roboto_17
+              on_press:
+                then:
+                  - homeassistant.service:
+                      service: media_player.media_play_pause
+                      data:
+                        entity_id: media_player.spotify_matt_greathouse
+          - button:
+              id: next_btn
+              x: 215
+              y: 150
+              width: 100
+              height: 45
+              bg_color: 0x000000
+              widgets:
+                - image :
+                    id: forward_icon
+                    src: forward 
+                    antialias: true
+                    align: center
+                    #mode: real
+               # - label :
+               #     align: center
+               #     text: ">>"
+               #     text_font: roboto_17
+               
+              on_press:
+                then:
+                  - homeassistant.service:
+                      service: media_player.media_next_track
+                      data:
+                        entity_id: media_player.spotify_matt_greathouse
+
+        
+interval:
+  - interval: 1s
+    then:
+      - lvgl.label.update:
+          id: title_text
+          text: !lambda 'return ("Title: " + id(media_title).state).c_str();'
+      - lvgl.label.update:
+          id: artist_text
+          text: !lambda 'return ("Artist: " + id(media_artist).state).c_str();'
+                      
+
+#switch.kitchen_lights_socket_1
+
+font:
+  - file: "fonts/Arimo-Regular.ttf"
+    id: font1
+    size: 30
+    bpp: 4
+  - file: "fonts/Arimo-Regular.ttf"
+    id: font2
+    size: 28
+    bpp: 4
+  - file: "fonts/Arimo-Regular.ttf"
+    id: font3
+    size: 18
+    bpp: 4
+  - file:
+      type: gfonts
+      family: Roboto
+      weight: 700
+    id: roboto_16
+    size: 20
+    bpp: 4
+  - file:
+      type: gfonts
+      family: Roboto
+      weight: 700
+    id: roboto_17
+    size: 30
+    bpp: 4
+
+  - file:
+      type: gfonts
+      family: BBH+Sans+Bogle
+      weight: 400
+    id: bbh_16
+    size: 40
+    bpp: 4
+  - file:
+      type: gfonts
+      family: Bebas+Neue
+      weight: 400
+    id: bbn_16
+    size: 30
+    bpp: 4
+  - file:
+      type: gfonts
+      family: Russo+One
+      weight: 400
+    id: ro_16
+    size: 30
+    bpp: 4
+  - file:
+      type: gfonts
+      family: Bebas+Neue
+      weight: 400
+    id: bbn_17
+    size: 35
+    bpp: 4
+  - file:
+      type: gfonts
+      family: Russo+One
+      weight: 400
+    id: ro_17
+    size: 35
+    bpp: 4
+  - file:
+      type: gfonts
+      family: Russo+One
+      weight: 400
+    id: ro_12
+    size: 16
+    bpp: 4
+  - file:
+      type: gfonts
+      family: Bebas+Neue
+      weight: 400
+    id: bbn_12
+    size: 22
+    bpp: 4
+
+
+touchscreen:
+  - platform: xpt2046
+    id: xpt2046_touch
+    spi_id: touch
+    cs_pin: GPIO33
+    interrupt_pin: GPIO36
+    update_interval: 50ms
+    calibration:
+      x_min: 340
+      x_max: 3860
+      y_min: 280
+      y_max: 3860
+    transform:
+      swap_xy: true
+
+
+
+# Home Assistant Switches
+switch:
+  - platform: homeassistant
+    name: "Garage Light"
+    id: garage_light
+    entity_id: switch.garage_light_socket_1
+
+  - platform: homeassistant
+    name: "Bedroom Light"
+    id: bedroom_light
+    entity_id: switch.bedroom_lights_new_switch_1
+
+  - platform: homeassistant
+    name: "Backyard Light"
+    id: backyard_light
+    entity_id: switch.deck_light_switch_1
+
+  - platform: homeassistant
+    name: "Floor Lamp"
+    id: floor_light
+    entity_id: switch.floor_lamp_socket
+    
+  - platform: homeassistant
+    name: "Ad Block"
+    id: adblock
+    entity_id: switch.adguard_home_filtering
+
+  - platform: homeassistant
+    name: "Office Light"
+    id: office_light
+    entity_id: switch.office_uplight_socket_1
+
+  - platform: homeassistant
+    name: "Office Light"
+    id: officedesk_light
+    entity_id: switch.kitchen_lights_socket_1
+  - platform: homeassistant
+    name: "Pool Light"
+    id: pool_light
+    entity_id: switch.pool_lights_socket_1
+
+#switch.kitchen_lights_socket_1
+
+binary_sensor:
+  - platform: homeassistant
+    id: garage_light_status
+    entity_id: switch.garage_light_socket_1
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: button_0
+          state:
+            checked: !lambda return x;
+
+  - platform: homeassistant
+    name: "Bedroom Light"
+    id: bedroom_light_status
+    entity_id: switch.bedroom_lights_new_switch_1
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: button_1
+          state:
+            checked: !lambda return x;
+  - platform: homeassistant
+    name: "BackYard Light"
+    id: backyard_light_status
+    entity_id: switch.deck_light_switch_1
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: button_9
+          state:
+            checked: !lambda return x;
+  - platform: homeassistant
+    name: "Floor Lamp"
+    id: floor_light_status
+    entity_id: switch.floor_lamp_socket
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: button_10
+          state:
+            checked: !lambda return x;
+  - platform: homeassistant
+    name: "Ad Block"
+    id: adblock_status
+    entity_id: switch.adguard_home_filtering
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: button_11
+          state:
+            checked: !lambda return x;
+  - platform: homeassistant
+    name: "Office Up"
+    id: office_light_status
+    entity_id: switch.office_uplight_socket_1
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: button_12
+          state:
+            checked: !lambda return x;
+
+  - platform: homeassistant
+    name: "Office desk"
+    id: office_desk_status
+    entity_id: switch.kitchen_lights_socket_1
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: button_35
+          state:
+            checked: !lambda return x;
+  - platform: homeassistant
+    name: "Pool Light"
+    id: pool_light_status
+    entity_id: switch.pool_lights_socket_1
+    publish_initial_state: true
+    on_state:
+      then:
+        lvgl.widget.update:
+          id: button_12
+          state:
+            checked: !lambda return x;
+
+
+
+text_sensor:
+  - platform: homeassistant
+    id: outside_temperature
+    entity_id: sensor.kpkb_temperature
+    internal: true
+    on_value:
+        then:
+          - lvgl.label.update:
+              id: label_12
+             # text:
+              #  format: "Temp: %s"
+              #  args: [ 'id(outside_temperature).state()' ]
+              text: !lambda return id(outside_temperature).state;
+#                args: id(outside_temperature).state
+  - platform: homeassistant
+    id: outside_cond
+    entity_id: weather.kpkb
+    internal: true
+    on_value:
+        then:
+          - lvgl.label.update:
+              id: label_13
+             # text:
+              #  format: "Temp: %s"
+              #  args: [ 'id(outside_temperature).state()' ]
+              text: !lambda return id(outside_cond).state;
+#                args: id(outside_temperature).state
+
+  - platform: homeassistant
+    id: current_condition
+    entity_id: weather.kpkb
+    internal: true
+    on_value:
+        then:       
+          
+  - platform: homeassistant
+    id: svr_pwr
+    entity_id: sensor.server_power_power
+    internal: true
+    on_value:
+        then:
+          - lvgl.label.update:
+              id: label_16
+              text: !lambda return id(svr_pwr).state;
+  - platform: homeassistant
+    id: fan_tmp
+    entity_id: sensor.pool_heater_fan_temperature
+    internal: true
+    on_value:
+        then:
+          - lvgl.label.update:
+              id: label_18
+              text: !lambda return id(fan_tmp).state;
+  - platform: homeassistant
+    id: alarm_sys
+    entity_id: sensor.transmission_active_torrents
+    internal: true
+    on_value:
+        then:
+          - lvgl.label.update:
+              id: label_23
+              text: !lambda return id(alarm_sys).state;
+  - platform: homeassistant
+    id: plex_num
+    entity_id: sensor.tautulli_watching
+    internal: true
+    on_value:
+        then:
+          - lvgl.label.update:
+              id: label_25
+              text: !lambda return id(plex_num).state;
+  - platform: homeassistant
+    id: routertxt
+    entity_id: sensor.freebsd_router_download_speed
+    internal: true
+    on_raw_value:
+        then:
+          - lvgl.label.update:
+              id: label_29
+              text: !lambda |-
+                double bps = std::atof(id(routertxt).state.c_str());
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%.2f Mbps", bps);
+                return std::string(buf);
+
+  - platform: homeassistant
+    id: routeruptxt
+    entity_id: sensor.freebsd_router_upload_speed
+    internal: true
+    on_raw_value:
+        then:
+          - lvgl.label.update:
+              id: label_31   
+              text: !lambda |-
+                double bps = std::atof(id(routeruptxt).state.c_str());
+                char buf[16];
+                snprintf(buf, sizeof(buf), "%.2f Mbps", bps);
+                return std::string(buf);
+  - platform: homeassistant
+    id: finishtime
+    entity_id: sensor.octoprint_job_percentage
+    internal: true
+    on_value:
+        then:
+          - lvgl.label.update:
+              id: label_33
+              text: !lambda return id(finishtime).state;
+
+  - platform: homeassistant
+    entity_id: media_player.spotify_matt_greathouse
+    attribute: media_title
+    id: media_title
+
+  - platform: homeassistant
+    entity_id: media_player.spotify_matt_greathouse
+    attribute: media_artist
+    id: media_artist
+              
+sensor:
+  
+  - platform: adc
+    pin: GPIO34  # Replace with the actual GPIO pin connected to the light sensor
+    name: "Light Sensor"
+    id: light_sensor
+    update_interval: 5s
+    on_value_range:
+      - above: 0.0
+        below: 0.2
+        then:
+          - light.turn_on:
+              id: backlight
+              brightness: 100%
+      - above: 0.3
+        below: 0.6
+        then:
+          - light.turn_on:
+              id: backlight
+              brightness: 70%
+      - above: 0.6
+        then:
+          - light.turn_on:
+              id: backlight
+              brightness: 60%
