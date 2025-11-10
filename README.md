@@ -10,9 +10,9 @@ I decided to dive into programming a CYD (Cheap Yellow Display) using LVGL as th
 ## Equipment
 ESP32 Development Board ESP32-2432S028R  
 Known as the "Cheap Yellow Display"  
-You can find them easily on Amazon or other marketplaces by searching "ESP32 CYD"
+You can find them easily on Amazon or other marketplaces by searching "ESP32 CYD"  
 
-### Key Features:
+## Key Features:
 - **Control Buttons:** Multiple buttons to manage lights, such as backyard lights and garage lights.
 - **AdGuard Toggle:** Easily enable or disable AdGuard blocking (useful if your partner wants to earn rewards on her mobile games by watching ads).
 - **Top Layer:** Time, temperature, and page navigation displayed across all pages.
