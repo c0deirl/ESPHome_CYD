@@ -1,4 +1,5 @@
-# ESPHome_CYD
+# ESPHome + LVGL on a CYD
+<img width="912" height="199" alt="esphomelvgl" src="https://github.com/user-attachments/assets/f0b237d8-33dc-4333-b13f-ba1c7ed2bd49" />
 
 ## Overview
 ESPHome on a CYD (Cheap Yellow Display - ESP32-2432S028R) Using LVGL Graphics
