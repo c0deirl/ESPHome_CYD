@@ -38,4 +38,15 @@ There are four pages in total:
 The entire project is contained in a single YAML file. I have included detailed comments to help others understand and replicate the setup.
 
 ## Pictures
-[Insert pictures here]
+
+### Page 1
+![25-11-10 08-42-47 1049](https://github.com/user-attachments/assets/e1754b4f-7c86-497e-8f34-49ff761ff8d9)
+
+### Page 2
+![25-11-10 08-42-53 1050](https://github.com/user-attachments/assets/ac890a1a-0335-4b86-a6e6-5b5b53f2f587)
+
+### Page 3
+![25-11-10 08-42-58 1051](https://github.com/user-attachments/assets/c66a9ab2-ee9f-4023-a51d-e75b286035e5)
+
+### Page 4
+![25-11-10 08-43-03 1052](https://github.com/user-attachments/assets/6913a107-05b2-407a-90f4-74ca28d14f80)
