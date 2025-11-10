@@ -5,12 +5,17 @@
 ESPHome on a CYD (Cheap Yellow Display - ESP32-2432S028R) Using LVGL Graphics
 
 ## Project Description
-I decided to dive into programming a CYD using LVGL as the graphics library and ESPHome. This project was challenging due to the lack of comprehensive documentation and examples. The display serves as a basic bedside control surface.
+I decided to dive into programming a CYD (Cheap Yellow Display) using LVGL as the graphics library and ESPHome. This project was challenging due to the lack of comprehensive documentation and examples of valid working SINGLE YAML files. I wanted a simple, single paged YAML file, that had the functionality I needed without any extra bloat. The display serves as a basic Home Assistant control surface with a good looking GUI, but on a budget.
+
+## Equipment
+ESP32 Development Board ESP32-2432S028R  
+Known as the "Cheap Yellow Display"  
+You can find them easily on Amazon or other marketplaces by searching "ESP32 CYD"
 
 ### Key Features:
-- **Control Buttons:** Six buttons to manage lights, such as backyard lights and garage lights.
-- **AdGuard Toggle:** Easily enable or disable AdGuard for mobile gaming rewards.
-- **Top Layer:** Navigation, time, and temperature displayed across all pages.
+- **Control Buttons:** Multiple buttons to manage lights, such as backyard lights and garage lights.
+- **AdGuard Toggle:** Easily enable or disable AdGuard blocking (useful if your partner wants to earn rewards on her mobile games by watching ads).
+- **Top Layer:** Time, temperature, and page navigation displayed across all pages.
 - **Info Page:** Outside temperature, server power draw, and other relevant information.
 - **Office Page:** Router bandwidth data (Opnsense integrated into HA) and 3D printer progress.
 - **Spotify Control:** Forward, pause/play, and backward buttons for controlling Spotify.
@@ -19,11 +24,11 @@ I decided to dive into programming a CYD using LVGL as the graphics library and 
 There are four pages in total:
 
 1. **Page 1: Basic Control Buttons**
-   - **Functionality:** Control lights, AdGuard toggle.
-   - **Description:** Essential for ensuring the right devices are off before bed.
+   - **Functionality:** Control buttons, AdGuard toggle.
+   - **Description:** Essential for ensuring the right devices are on or off while working from home, or getting ready for bed.
 
 2. **Page 2: Relevant Info**
-   - **Functionality:** Display outside temperature, server power draw.
+   - **Functionality:** Display outside temperature, Home Lab power draw.
    - **Description:** Useful for quick checks and monitoring.
 
 3. **Page 3: Office Page**
